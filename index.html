@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Losinn's Watchlist — track the shows, anime and films you've watched, with IMDb / Rotten Tomatoes / Metacritic ratings, per-episode IMDb scores, and recommendations built from your own library.">
+<title>Losinn's Watchlist</title>
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">◉</span> LOSINN'S <span class="brand-thin">WATCHLIST</span></div>
+  <div class="brand-sub">shows · anime · films — ratings and recommendations from what you've actually watched</div>
+  <nav class="nav" id="nav">
+    <button class="nav-btn active" data-view="library">Library</button>
+    <button class="nav-btn" data-view="discover">Add shows</button>
+    <button class="nav-btn" data-view="foryou">For you</button>
+    <button class="nav-btn" data-view="settings">Settings</button>
+  </nav>
+</header>
+
+<!-- ── Setup banner: shown until a TMDB key exists ─────────────────────────── -->
+<div class="setup-banner" id="setupBanner" hidden>
+  <strong>Almost there —</strong> add a free TMDB key (and optionally an OMDb key for
+  IMDb / Rotten Tomatoes scores) in <button class="linkish" data-goto="settings">Settings</button>
+  to start searching.
+</div>
+
+<!-- ── LIBRARY ─────────────────────────────────────────────────────────────── -->
+<main class="layout view" id="view-library">
+
+  <aside class="panel side">
+    <h2 class="panel-title">Sections</h2>
+    <div class="mode-list" id="sectionList"></div>
+
+    <h2 class="panel-title" style="margin-top:22px">Status</h2>
+    <div class="seg seg-wrap" id="statusSeg"></div>
+
+    <h2 class="panel-title" style="margin-top:22px">Sort</h2>
+    <select id="sortSelect" class="full">
+      <option value="added">Recently added</option>
+      <option value="updated">Recently updated</option>
+      <option value="title">Title (A–Z)</option>
+      <option value="myrating">My rating</option>
+      <option value="imdb">IMDb rating</option>
+      <option value="year">Year (newest)</option>
+    </select>
+
+    <h2 class="panel-title" style="margin-top:22px">Your numbers</h2>
+    <div class="stat-grid" id="statGrid"></div>
+  </aside>
+
+  <section class="panel main-col">
+    <div class="col-head">
+      <h2 class="panel-title" id="libraryTitle">Everything</h2>
+      <input type="text" id="libraryFilter" placeholder="filter your library…">
+    </div>
+    <div class="card-grid" id="libraryGrid"></div>
+    <p class="empty" id="libraryEmpty" hidden>
+      Nothing here yet. Head to <button class="linkish" data-goto="discover">Add shows</button>
+      and search for something you've watched.
+    </p>
+  </section>
+</main>
+
+<!-- ── DISCOVER ────────────────────────────────────────────────────────────── -->
+<main class="layout one-col view" id="view-discover" hidden>
+  <section class="panel">
+    <h2 class="panel-title">Search TMDB <span class="panel-title-sub">— shows, anime and films</span></h2>
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="e.g. Frieren, Breaking Bad, Dune…" autocomplete="off">
+      <button class="btn btn-accent" id="searchBtn">Search</button>
+    </div>
+    <div class="seg seg-wrap" id="searchTypeSeg" style="margin-top:12px"></div>
+    <p class="notes" id="searchNote">Add anything you've watched — status, your own score and progress are all editable after.</p>
+    <div class="card-grid" id="searchGrid" style="margin-top:16px"></div>
+  </section>
+</main>
+
+<!-- ── FOR YOU ─────────────────────────────────────────────────────────────── -->
+<main class="layout one-col view" id="view-foryou" hidden>
+  <section class="panel">
+    <div class="col-head">
+      <h2 class="panel-title">Recommended for you <span class="panel-title-sub">— built from your own library</span></h2>
+      <button class="btn btn-secondary" id="recRefresh">Rebuild</button>
+    </div>
+    <div class="seg seg-wrap" id="recSeg"></div>
+    <p class="notes" id="recNote">
+      Every title you've rated 6+ (or finished) votes for what comes next. Higher your score,
+      louder its vote. Anything already in your library — or hidden — is filtered out.
+    </p>
+    <div class="card-grid" id="recGrid" style="margin-top:16px"></div>
+  </section>
+</main>
+
+<!-- ── SETTINGS ────────────────────────────────────────────────────────────── -->
+<main class="layout view" id="view-settings" hidden>
+  <section class="panel">
+    <h2 class="panel-title">API keys <span class="panel-title-sub">— stored only in this browser</span></h2>
+
+    <div class="key-field">
+      <label for="tmdbKey">TMDB key <span class="req">required</span></label>
+      <input type="text" id="tmdbKey" placeholder="v3 API key" spellcheck="false">
+      <p class="notes">
+        Powers search, posters, seasons, episode lists and the recommendation graph.
+        Free: make an account at <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener">themoviedb.org</a>,
+        then <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">Settings → API</a>
+        and copy the <em>API Key (v3 auth)</em>.
+      </p>
+    </div>
+
+    <div class="key-field">
+      <label for="omdbKey">OMDb key <span class="opt">optional</span></label>
+      <input type="text" id="omdbKey" placeholder="8 characters" spellcheck="false">
+      <p class="notes">
+        Adds the IMDb rating, Rotten Tomatoes and Metacritic scores, and <strong>per-episode
+        IMDb ratings</strong>. Free key (1,000 lookups/day) at
+        <a href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noopener">omdbapi.com</a> —
+        activate it from the confirmation email.
+      </p>
+    </div>
+
+    <button class="btn btn-primary" id="saveKeys">Save keys</button>
+    <p class="notes" id="keyStatus"></p>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel-title">Your data</h2>
+    <p class="notes" style="margin-top:0">
+      Everything lives in this browser's <code>localStorage</code> — nothing is uploaded anywhere.
+      Export if you want a backup or to move browsers.
+    </p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="exportBtn">Export JSON</button>
+      <button class="btn btn-secondary" id="importBtn">Import JSON</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>
+
+    <h2 class="panel-title" style="margin-top:22px">Cached ratings</h2>
+    <p class="notes" style="margin-top:0" id="cacheInfo"></p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="clearCache">Clear ratings cache</button>
+      <button class="btn btn-danger" id="clearAll">Delete everything</button>
+    </div>
+
+    <h2 class="panel-title" style="margin-top:22px">Where the numbers come from</h2>
+    <p class="notes" style="margin-top:0">
+      IMDb and Rotten Tomatoes don't publish public APIs, so OMDb is used as the relay for both —
+      it carries the IMDb score and vote count, the Rotten Tomatoes tomatometer and the Metascore.
+      RT publishes a score per <em>series</em> (and per film), never per episode, so the episode
+      heatmap uses IMDb episode scores, with TMDB's own episode averages alongside as a second opinion.
+    </p>
+  </section>
+</main>
+
+<!-- ── DETAIL MODAL ────────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="app.js?v=1"></script>
+</body>
+</html>
