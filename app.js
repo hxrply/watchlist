@@ -1345,7 +1345,7 @@ function renderAll() {
 // One delegated click handler for the whole page: every button carries either a
 // data-act (a verb) or a data-* filter, so nothing needs rebinding after render.
 document.addEventListener('click', e => {
-  const el = e.target.closest('[data-act], [data-section], [data-status], [data-searchtype], [data-recscope], [data-view], [data-goto], .card');
+  const el = e.target.closest('[data-act], [data-section], [data-status], [data-searchtype], [data-recscope], [data-browsescope], [data-view], [data-goto], .card');
   if (!el) return;
 
   // Navigation
