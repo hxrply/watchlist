@@ -53,12 +53,19 @@ python serve.py
 It picks a free port and opens your browser to it. Or just open `index.html`
 directly — there's no build step.
 
+## Publish
+
+Double-click `publish.bat` (or run `.\publish.ps1`). First run creates the public
+repo, pushes and enables GitHub Pages; later runs just push. It never commits for
+you — commit first, then publish.
+
 ## Files
 
 - `index.html` — the page
 - `style.css` — all styling (self-contained)
 - `app.js` — library, API layer, ratings, episode heatmap, recommendation engine
 - `serve.py` — no-cache static dev server
+- `publish.ps1` / `publish.bat` — one-step publish to GitHub Pages
 
 ## Notes on the data
 
