@@ -15,6 +15,13 @@ Everything (library, scores, progress, tags, API keys) lives in your browser's
   animation is detected from TMDB's genre + origin data), and you can add your
   own tags — `shonen`, `comfort`, `rewatch`, whatever — which become their own
   sections in the sidebar.
+- **Paste a whole list.** Dump everything you've watched in one go — one title per
+  line, or comma separated. It strips numbering, bullets and a parenthesised year,
+  reads a trailing number as your score (`Breaking Bad - 9`) and a trailing word as
+  that title's status (`The Bear — watching`), then looks each one up. Every match
+  is labelled *exact / likely / check / no match*, wrong guesses are correctable
+  from a dropdown of the other candidates, and duplicates or titles you already own
+  are switched off — nothing is saved until you press Add.
 - **Ratings from everywhere.** IMDb score and vote count, Rotten Tomatoes
   tomatometer, Metascore and TMDB average, side by side.
 - **Per-episode ratings.** A season heatmap of IMDb episode scores — instantly
