@@ -22,6 +22,10 @@ Everything (library, scores, progress, tags, API keys) lives in your browser's
   is labelled *exact / likely / check / no match*, wrong guesses are correctable
   from a dropdown of the other candidates, and duplicates or titles you already own
   are switched off — nothing is saved until you press Add.
+- **Scroll and tap.** Under *For you*, a wall of titles filtered by type, decade
+  and genre — one tap files something as watched, no score required, tap again to
+  undo. Built for filling your library by recognising things rather than
+  remembering them. Recommendation cards carry the same *Seen it* button.
 - **Ratings from everywhere.** IMDb score and vote count, Rotten Tomatoes
   tomatometer, Metascore and TMDB average, side by side.
 - **Per-episode ratings.** A season heatmap of IMDb episode scores — instantly
