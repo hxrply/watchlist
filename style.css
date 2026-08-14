@@ -1,5 +1,5 @@
-/* Losinn's Watchlist — self-contained. Shares the palette and component language
-   of the aim trainer so the two apps read as the same family. */
+/* Losinn's Watchlist — all styling for the app, self-contained. No dependencies,
+   no shared stylesheet, nothing imported. */
 
 :root {
   --bg: #18151c;
