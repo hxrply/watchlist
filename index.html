@@ -6,7 +6,7 @@
 <meta name="description" content="Losinn's Watchlist — track the shows, anime and films you've watched, with IMDb / Rotten Tomatoes / Metacritic ratings, per-episode IMDb scores, and recommendations built from your own library.">
 <title>Losinn's Watchlist</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -121,6 +121,34 @@ Dune, Arrival, Sicario"></textarea>
     </p>
     <div class="card-grid" id="recGrid" style="margin-top:16px"></div>
   </section>
+
+  <section class="panel">
+    <h2 class="panel-title">Seen it already? <span class="panel-title-sub">— scroll and tap the ones you've watched</span></h2>
+    <div class="browse-bar">
+      <div class="seg seg-wrap" id="browseScope"></div>
+      <div class="browse-selects">
+        <select id="browseSort">
+          <option value="popularity">Most popular</option>
+          <option value="rating">Highest rated</option>
+        </select>
+        <select id="browseDecade">
+          <option value="">Any year</option>
+          <option value="2020">2020s</option>
+          <option value="2010">2010s</option>
+          <option value="2000">2000s</option>
+          <option value="1990">1990s</option>
+          <option value="1980">1980s</option>
+        </select>
+        <select id="browseGenre"><option value="">Any genre</option></select>
+      </div>
+    </div>
+    <p class="notes" style="margin-top:10px">
+      One tap adds it as watched — no score needed, and you can always set one later.
+      Tap again to undo. Everything you add here feeds the recommendations above.
+    </p>
+    <div class="card-grid" id="browseGrid" style="margin-top:16px"></div>
+    <div class="browse-more" id="browseMore"></div>
+  </section>
 </main>
 
 <!-- ── SETTINGS ────────────────────────────────────────────────────────────── -->
@@ -193,6 +221,6 @@ Dune, Arrival, Sicario"></textarea>
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

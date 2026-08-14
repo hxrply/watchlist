@@ -57,6 +57,7 @@ const ui = {
   recs: null,         // last computed list
   searchType: 'all',
   bulkRows: [],       // parsed + matched lines from a pasted list
+  browse: { scope: 'all', sort: 'popularity', decade: '', genre: '', page: 1, items: [] },
 };
 
 /* ══ Storage ═════════════════════════════════════════════════════════════ */
@@ -314,7 +315,7 @@ function cardHtml(media, opts = {}) {
     ? `<div class="card-meta" style="margin-top:3px">S${inLib.progress.season}·E${inLib.progress.episode}</div>` : '';
 
   return `
-    <article class="card" data-key="${media.key}">
+    <article class="card ${opts.owned ? 'owned' : ''}" data-key="${media.key}">
       ${inLib ? `<div class="status-strip st-${inLib.status}"></div>` : ''}
       <div style="position:relative">${posterHtml(media)}${badges.join('')}</div>
       <div class="card-body">
@@ -728,7 +729,8 @@ async function buildRecs() {
     .slice(0, 14);   // cap the request fan-out; the top of your library carries it
 
   if (!seeds.length) {
-    grid.innerHTML = '<p class="empty">Rate a few things you\'ve watched and this fills up.</p>';
+    grid.innerHTML = '<p class="empty">Add a few things you\'ve watched — below, or from Add shows — ' +
+      'and this fills up. Scoring them sharpens it, but isn\'t required.</p>';
     return;
   }
 
@@ -792,6 +794,7 @@ function renderRecs() {
     return cardHtml(stash(entry.media), {
       reason: 'Because you watched ' + why.join(' & '),
       actions: `<button class="btn btn-accent btn-tiny" data-act="add" data-key="${entry.media.key}" data-status="planned">Plan</button>
+                <button class="btn btn-secondary btn-tiny" data-act="add" data-key="${entry.media.key}" data-status="completed">Seen it</button>
                 <button class="btn btn-secondary btn-tiny" data-act="hide" data-key="${entry.media.key}">Not for me</button>`,
     });
   }).join('');
@@ -806,6 +809,145 @@ function renderRecSeg() {
   ];
   $('#recSeg').innerHTML = opts.map(o =>
     `<button class="seg-btn ${ui.recScope === o.id ? 'active' : ''}" data-recscope="${o.id}">${o.label}</button>`).join('');
+}
+
+/* ══ Browse / catch-up ═══════════════════════════════════════════════════ */
+
+/* A wall of titles to scroll, so you can fill your library by recognising things
+   rather than remembering them and typing them in. One tap files it as watched
+   with no score — scoring is optional and can happen later, or never. */
+
+async function loadBrowse(append) {
+  const b = ui.browse;
+  const grid = $('#browseGrid');
+  const more = $('#browseMore');
+
+  if (!append) { b.page = 1; b.items = []; grid.innerHTML = '<p class="loading">Loading…</p>'; }
+  more.innerHTML = '<p class="loading">Loading…</p>';
+
+  const decade = b.decade
+    ? { from: `${b.decade}-01-01`, to: `${parseInt(b.decade, 10) + 9}-12-31` } : null;
+
+  const common = { page: String(b.page), include_adult: 'false' };
+  if (b.sort === 'rating') {
+    common.sort_by = 'vote_average.desc';
+    common['vote_count.gte'] = '300';     // otherwise a 10.0 from four people wins
+  } else {
+    common.sort_by = 'popularity.desc';
+    common['vote_count.gte'] = '40';
+  }
+
+  const tvParams = Object.assign({}, common);
+  const movieParams = Object.assign({}, common);
+  if (decade) {
+    tvParams['first_air_date.gte'] = decade.from;
+    tvParams['first_air_date.lte'] = decade.to;
+    movieParams['primary_release_date.gte'] = decade.from;
+    movieParams['primary_release_date.lte'] = decade.to;
+  }
+  if (b.scope === 'anime') {
+    tvParams.with_original_language = 'ja';
+    movieParams.with_original_language = 'ja';
+    tvParams.with_genres = b.genre ? `16,${b.genre}` : '16';
+    movieParams.with_genres = b.genre ? `16,${b.genre}` : '16';
+  } else if (b.genre) {
+    tvParams.with_genres = b.genre;
+    movieParams.with_genres = b.genre;
+  }
+
+  const wants = {
+    all:   ['tv', 'movie'],
+    anime: ['tv', 'movie'],
+    tv:    ['tv'],
+    movie: ['movie'],
+  }[b.scope];
+
+  try {
+    const pages = await Promise.all(wants.map(kind =>
+      tmdb(`/discover/${kind}`, kind === 'tv' ? tvParams : movieParams, TTL.search)
+        .then(d => (d.results || []).map(r => normalize(r, kind)).filter(Boolean))
+        .catch(() => [])
+    ));
+
+    // Interleave so a mixed scope doesn't show 20 series then 20 films.
+    const merged = [];
+    for (let i = 0; i < Math.max(...pages.map(p => p.length), 0); i++) {
+      for (const p of pages) if (p[i]) merged.push(p[i]);
+    }
+
+    const seen = new Set(b.items.map(m => m.key));
+    const fresh = merged.filter(m => m.poster && !seen.has(m.key));
+    b.items = b.items.concat(fresh);
+
+    if (!b.items.length) {
+      grid.innerHTML = '<p class="empty">Nothing matches those filters — try widening them.</p>';
+      more.innerHTML = '';
+      return;
+    }
+    renderBrowse();
+    more.innerHTML = '<button class="btn btn-secondary" id="browseMoreBtn">Load more</button>';
+    $('#browseMoreBtn').addEventListener('click', () => { ui.browse.page++; loadBrowse(true); });
+  } catch (e) {
+    grid.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+    more.innerHTML = '';
+  }
+}
+
+function browseActions(media) {
+  const item = state.items[media.key];
+  if (item) {
+    return `<button class="btn btn-secondary btn-tiny" data-act="browse-undo" data-key="${media.key}">✓ ${esc(STATUS_LABEL[item.status])} · undo</button>`;
+  }
+  return `<button class="btn btn-accent btn-tiny" data-act="browse-add" data-key="${media.key}" data-status="completed">✓ Watched</button>
+          <button class="btn btn-secondary btn-tiny" data-act="browse-add" data-key="${media.key}" data-status="planned">Plan</button>`;
+}
+
+function renderBrowse() {
+  $('#browseGrid').innerHTML = ui.browse.items.map(m =>
+    cardHtml(stash(m), { actions: browseActions(m), owned: !!state.items[m.key] })).join('');
+}
+
+// Only the tapped card is redrawn — rebuilding the whole grid would throw away
+// your scroll position, which is the entire point of this view.
+function patchBrowseCard(key) {
+  const card = $(`#browseGrid .card[data-key="${CSS.escape(key)}"]`);
+  const media = mediaFor(key);
+  if (!card || !media) return;
+  card.outerHTML = cardHtml(media, { actions: browseActions(media), owned: !!state.items[key] });
+}
+
+function renderBrowseScope() {
+  const opts = [
+    { id: 'all', label: 'Everything' },
+    { id: 'anime', label: 'Anime' },
+    { id: 'tv', label: 'Series' },
+    { id: 'movie', label: 'Films' },
+  ];
+  $('#browseScope').innerHTML = opts.map(o =>
+    `<button class="seg-btn ${ui.browse.scope === o.id ? 'active' : ''}" data-browsescope="${o.id}">${o.label}</button>`).join('');
+}
+
+// TV and film genre ids differ, so the list is reloaded per scope and the filter
+// is switched off for mixed browsing where the ids would not agree.
+async function loadGenreOptions() {
+  const sel = $('#browseGenre');
+  const scope = ui.browse.scope;
+  if (scope === 'all') {
+    sel.innerHTML = '<option value="">Any genre</option>';
+    sel.disabled = true;
+    ui.browse.genre = '';
+    return;
+  }
+  sel.disabled = false;
+  try {
+    const path = scope === 'movie' ? '/genre/movie/list' : '/genre/tv/list';
+    const data = await tmdb(path, {}, 30 * 864e5);
+    const keep = (data.genres || []).filter(g => !(scope === 'anime' && g.id === ANIMATION_GENRE));
+    sel.innerHTML = '<option value="">Any genre</option>' +
+      keep.map(g => `<option value="${g.id}" ${String(g.id) === ui.browse.genre ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Any genre</option>';
+  }
 }
 
 /* ══ Ratings ═════════════════════════════════════════════════════════════ */
@@ -1185,6 +1327,7 @@ function setView(view) {
   if (view === 'settings') renderSettings();
   if (view === 'discover' && !$('#searchGrid').innerHTML) showTrending();
   if (view === 'foryou' && !ui.recs) buildRecs();
+  if (view === 'foryou' && !ui.browse.items.length) { loadGenreOptions(); loadBrowse(false); }
   window.scrollTo({ top: 0 });
 }
 
@@ -1218,6 +1361,14 @@ document.addEventListener('click', e => {
   }
   if (el.dataset.searchtype) { ui.searchType = el.dataset.searchtype; renderSearchSeg(); runSearch(); return; }
   if (el.dataset.recscope) { ui.recScope = el.dataset.recscope; renderRecSeg(); renderRecs(); return; }
+  if (el.dataset.browsescope) {
+    ui.browse.scope = el.dataset.browsescope;
+    ui.browse.genre = '';
+    renderBrowseScope();
+    loadGenreOptions();
+    loadBrowse(false);
+    return;
+  }
 
   const act = el.dataset.act;
   const key = el.dataset.key;
@@ -1232,6 +1383,17 @@ document.addEventListener('click', e => {
     }
     case 'hide':
       state.hidden[key] = true; save(); renderRecs(); toast('Hidden.'); return;
+
+    case 'browse-add': {
+      const media = mediaFor(key);
+      if (media) addToLibrary(media, el.dataset.status || 'completed');
+      patchBrowseCard(key);
+      return;
+    }
+    case 'browse-undo':
+      removeItem(key);
+      patchBrowseCard(key);
+      return;
 
     case 'status':
       updateItem(key, { status: el.dataset.status });
@@ -1332,6 +1494,10 @@ function bind() {
   $('#searchBtn').addEventListener('click', runSearch);
   $('#searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
 
+  $('#browseSort').addEventListener('change', e => { ui.browse.sort = e.target.value; loadBrowse(false); });
+  $('#browseDecade').addEventListener('change', e => { ui.browse.decade = e.target.value; loadBrowse(false); });
+  $('#browseGenre').addEventListener('change', e => { ui.browse.genre = e.target.value; loadBrowse(false); });
+
   $('#bulkMatchBtn').addEventListener('click', runBulkMatch);
   $('#bulkClearBtn').addEventListener('click', () => {
     $('#bulkInput').value = '';
@@ -1393,6 +1559,7 @@ load();
 bind();
 renderSearchSeg();
 renderRecSeg();
+renderBrowseScope();
 renderAll();
 renderSettings();
 if (!state.settings.tmdbKey) setView('settings');

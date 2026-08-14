@@ -572,6 +572,45 @@ input[type=text]:focus, input[type=number]:focus, select:focus, textarea:focus {
 }
 .chip button:hover { color: var(--red); }
 
+/* ── Browse / catch-up ───────────────────────────────────────────────────── */
+.browse-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.browse-bar .seg { flex: 1; min-width: 240px; }
+.browse-selects { display: flex; gap: 8px; flex-wrap: wrap; }
+.browse-selects select { min-width: 118px; }
+
+.browse-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+.browse-more .btn { min-width: 200px; padding: 11px 18px; font-size: 13px; }
+
+/* A card you've just marked reads as done at a glance while you keep scrolling. */
+.card.owned { border-color: color-mix(in srgb, var(--green) 55%, var(--border)); }
+.card.owned .poster { opacity: 0.55; }
+.card.owned::after {
+  content: "✓";
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #0b1a12;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
 /* ── Bulk list import ────────────────────────────────────────────────────── */
 #bulkInput {
   width: 100%;
