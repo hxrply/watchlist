@@ -68,8 +68,13 @@ if (-not $hasOrigin) {
 
 # ── Turn on Pages (harmless to repeat — already-enabled just reports back) ───
 Write-Host "Enabling GitHub Pages..." -ForegroundColor Cyan
+# The body goes via a temp file, not a pipe: piping a string to a native exe in
+# Windows PowerShell re-encodes it and GitHub rejects the result as bad JSON.
 $body = '{"source":{"branch":"' + $branch + '","path":"/"}}'
-$pagesOut = $body | & $gh api --method POST "repos/$Owner/$Name/pages" --input - 2>&1
+$bodyFile = Join-Path $env:TEMP "gh-pages-body-$PID.json"
+[System.IO.File]::WriteAllText($bodyFile, $body, (New-Object System.Text.UTF8Encoding($false)))
+$pagesOut = & $gh api --method POST "repos/$Owner/$Name/pages" --input $bodyFile 2>&1
+Remove-Item $bodyFile -Force -ErrorAction SilentlyContinue
 if ($LASTEXITCODE -ne 0) {
     if ("$pagesOut" -match 'already enabled|409') {
         Write-Host "Pages was already enabled." -ForegroundColor DarkGray
