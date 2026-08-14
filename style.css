@@ -2,19 +2,19 @@
    no shared stylesheet, nothing imported. */
 
 :root {
-  --bg: #18151c;
-  --panel: #221e28;
-  --panel-2: #2b2532;
-  --panel-3: #332b39;
+  --bg: #0f1218;
+  --panel: #171b23;
+  --panel-2: #1e232d;
+  --panel-3: #272d39;
   --border: rgba(255,255,255,0.08);
-  --text: #f0e8f0;
-  --dim: #9c8fa3;
-  --accent: #ff4fa0;
-  --accent-2: #ff7ec2;
-  --green: #4fdc7a;
-  --gold: #ffd24f;
-  --red: #ff5f5f;
-  --blue: #6fa8ff;
+  --text: #e8eaf0;
+  --dim: #8b93a7;
+  --accent: #8b5cf6;
+  --accent-2: #a78bfa;
+  --green: #34d399;
+  --gold: #fbbf24;
+  --red: #f87171;
+  --blue: #38bdf8;
   --mono: "Cascadia Code", "Consolas", "SFMono-Regular", Menlo, monospace;
   --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
@@ -23,7 +23,7 @@
 
 body {
   margin: 0;
-  background: radial-gradient(circle at 20% -10%, #2a2030 0%, var(--bg) 55%);
+  background: radial-gradient(circle at 20% -10%, #1c2333 0%, var(--bg) 55%);
   color: var(--text);
   font-family: var(--sans);
   min-height: 100vh;
@@ -38,7 +38,7 @@ a { color: var(--accent-2); }
   gap: 14px;
   padding: 18px 28px;
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(255,79,160,0.10), transparent);
+  background: linear-gradient(180deg, rgba(139,92,246,0.12), transparent);
 }
 .brand {
   font-family: var(--mono);
@@ -317,7 +317,7 @@ input[type=text]:focus, input[type=number]:focus, select:focus, textarea:focus {
   width: 100%;
   aspect-ratio: 2 / 3;
   object-fit: cover;
-  background: linear-gradient(160deg, #322a3a, #241f2c);
+  background: linear-gradient(160deg, #262d3a, #1a1f29);
   display: block;
 }
 .poster-fallback {
@@ -405,7 +405,7 @@ input[type=text]:focus, input[type=number]:focus, select:focus, textarea:focus {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(8,6,12,0.78);
+  background: rgba(6,8,12,0.80);
   z-index: 40;
   display: flex;
   align-items: flex-start;
@@ -453,7 +453,7 @@ input[type=text]:focus, input[type=number]:focus, select:focus, textarea:focus {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, rgba(24,21,28,0.97) 30%, rgba(24,21,28,0.72));
+  background: linear-gradient(100deg, rgba(15,18,24,0.97) 30%, rgba(15,18,24,0.72));
 }
 .detail-hero > * { position: relative; }
 .detail-poster {
