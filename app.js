@@ -56,6 +56,7 @@ const ui = {
   recScope: 'all',
   recs: null,         // last computed list
   searchType: 'all',
+  bulkRows: [],       // parsed + matched lines from a pasted list
 };
 
 /* ══ Storage ═════════════════════════════════════════════════════════════ */
@@ -462,6 +463,237 @@ async function showTrending() {
   } catch (e) {
     grid.innerHTML = `<div class="err">${esc(e.message)}</div>`;
   }
+}
+
+/* ══ Bulk list import ════════════════════════════════════════════════════ */
+
+/* Takes a pasted list — however messily it's written — and works out what each
+   line is meant to be. Nothing is added to the library until the matches have
+   been shown and confirmed, because a wrong guess is worse than no guess. */
+
+const STATUS_WORDS = {
+  watching: 'watching', watched: 'completed', completed: 'completed',
+  complete: 'completed', finished: 'completed', done: 'completed',
+  planned: 'planned', plan: 'planned', ptw: 'planned', backlog: 'planned',
+  paused: 'paused', hold: 'paused', 'on hold': 'paused', hiatus: 'paused',
+  dropped: 'dropped', quit: 'dropped', abandoned: 'dropped',
+};
+
+function parseList(text) {
+  // A list is usually one per line; a single line with commas is a list too.
+  const raw = text.includes('\n') ? text.split(/\r?\n/) : text.split(/\s*,\s*/);
+  return raw.map(parseLine).filter(Boolean);
+}
+
+function parseLine(rawLine) {
+  const raw = rawLine.trim();
+  if (!raw) return null;
+
+  let s = raw;
+  s = s.replace(/^[\s\-–—*•>#·]+/, '');          // bullets
+  s = s.replace(/^\d+\s*[.)\]:]\s*/, '');        // "1." / "2)" / "3:"
+  s = s.replace(/\[[^\]]*\]/g, ' ');             // [tags]
+
+  let status = null;
+  const sw = s.match(/[\s\-–—|:(]+(watching|watched|completed|complete|finished|done|planned|plan(?: to watch)?|ptw|backlog|paused|on hold|hold|hiatus|dropped|quit|abandoned)\s*\)?\s*$/i);
+  if (sw) { status = STATUS_WORDS[sw[1].toLowerCase().replace(/ to watch$/, '')] || null; s = s.slice(0, sw.index); }
+
+  let rating = null;
+  const rt = s.match(/[\s\-–—|:]+(10|\d)(?:\s*\/\s*10)?\s*$/);
+  if (rt) { rating = parseInt(rt[1], 10); s = s.slice(0, rt.index); }
+
+  // Only a *parenthesised* year is stripped, so "Blade Runner 2049" survives.
+  let year = null;
+  const yr = s.match(/\s*[([]((?:19|20)\d{2})[)\]]\s*$/);
+  if (yr) { year = yr[1]; s = s.slice(0, yr.index); }
+
+  s = s.replace(/["“”']/g, '').replace(/[\s\-–—|:,.]+$/, '').trim();
+  if (!s) return null;
+
+  return { raw, query: s, year, rating, status, results: [], chosen: 0, conf: 'none', skip: false };
+}
+
+// Best guess at which search result the line meant: an exact title beats a
+// prefix, a matching year is strong corroboration, popularity breaks ties.
+function scoreCandidate(media, query, year) {
+  const t = media.title.toLowerCase();
+  const q = query.toLowerCase();
+  let score = 0;
+  if (t === q) score += 100;
+  else if (t.startsWith(q) || q.startsWith(t)) score += 60;
+  else if (t.includes(q) || q.includes(t)) score += 32;
+  if (year && media.year === year) score += 25;
+  score += Math.min(18, (media.tmdbVotes || 0) / 400);
+  return score;
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+async function runBulkMatch() {
+  const text = $('#bulkInput').value;
+  const box = $('#bulkResults');
+  const rows = parseList(text);
+
+  if (!rows.length) { box.innerHTML = '<p class="empty">Nothing to look up — paste a list first.</p>'; return; }
+
+  box.innerHTML = `<p class="loading">Looking up ${rows.length} title${rows.length === 1 ? '' : 's'}…</p>`;
+  $('#bulkMatchBtn').disabled = true;
+
+  let failed = null;
+  // Four at a time: fast enough for a long list, gentle enough on the API.
+  await mapLimit(rows, 4, async row => {
+    try {
+      const data = await tmdb('/search/multi', { query: row.query, include_adult: 'false' }, TTL.search);
+      const media = (data.results || []).map(r => normalize(r)).filter(Boolean);
+      const ranked = media
+        .map(m => ({ m, s: scoreCandidate(m, row.query, row.year) }))
+        .sort((a, b) => b.s - a.s)
+        .slice(0, 6);
+
+      row.results = ranked.map(r => r.m);
+      row.chosen = 0;
+      const top = ranked[0];
+      row.conf = !top ? 'none' : top.s >= 100 ? 'exact' : top.s >= 60 ? 'likely' : 'unsure';
+      row.skip = !top;
+    } catch (e) {
+      failed = failed || e;
+      row.results = []; row.conf = 'none'; row.skip = true;
+    }
+  });
+
+  $('#bulkMatchBtn').disabled = false;
+  if (failed) { box.innerHTML = `<div class="err">${esc(failed.message)}</div>`; return; }
+
+  // Duplicates within the pasted list, and things already owned, are switched off
+  // rather than hidden, so the count you see still matches the list you pasted.
+  const seen = new Set();
+  for (const row of rows) {
+    const media = row.results[row.chosen];
+    if (!media) continue;
+    if (state.items[media.key]) { row.conf = 'dupe'; row.skip = true; row.note = 'already in your library'; }
+    else if (seen.has(media.key)) { row.conf = 'dupe'; row.skip = true; row.note = 'duplicate of an earlier line'; }
+    else seen.add(media.key);
+  }
+
+  ui.bulkRows = rows;
+  renderBulkRows();
+}
+
+function renderBulkRows() {
+  const rows = ui.bulkRows || [];
+  const box = $('#bulkResults');
+  if (!rows.length) { box.innerHTML = ''; return; }
+
+  const ready = rows.filter(r => !r.skip && r.results[r.chosen]).length;
+  const unsure = rows.filter(r => !r.skip && (r.conf === 'unsure')).length;
+  const missing = rows.filter(r => !r.results.length).length;
+
+  const head = `<div class="imp-head">
+    <span>${rows.length} line${rows.length === 1 ? '' : 's'}</span>
+    <span>· ${ready} ready</span>
+    ${unsure ? `<span style="color:var(--gold)">· ${unsure} worth checking</span>` : ''}
+    ${missing ? `<span style="color:var(--red)">· ${missing} not found</span>` : ''}
+    <button class="btn btn-accent btn-tiny" id="bulkAddBtn" ${ready ? '' : 'disabled'}>Add ${ready} to library</button>
+  </div>`;
+
+  const body = rows.map((row, i) => {
+    const media = row.results[row.chosen];
+    const tag = { exact: 'exact', likely: 'likely', unsure: 'check', none: 'no match', dupe: 'skipped' }[row.conf];
+
+    const detail = [];
+    if (row.rating) detail.push(`your score ${row.rating}`);
+    if (row.status) detail.push(STATUS_LABEL[row.status].toLowerCase());
+    if (row.note) detail.push(row.note);
+
+    const alts = row.results.length > 1
+      ? `<select class="imp-alt" data-alt="${i}">${row.results.map((m, j) =>
+          `<option value="${j}" ${j === row.chosen ? 'selected' : ''}>${esc(m.title)}${m.year ? ' (' + m.year + ')' : ''} · ${m.mediaType === 'tv' ? 'Series' : 'Film'}</option>`).join('')}</select>`
+      : '';
+
+    return `<div class="imp-row conf-${row.conf} ${row.skip ? 'off' : ''}">
+      <input type="checkbox" data-pick="${i}" ${row.skip ? '' : 'checked'} ${media ? '' : 'disabled'}>
+      ${media && media.poster
+        ? `<img class="imp-poster" loading="lazy" src="${IMG}w92${media.poster}" alt="">`
+        : '<div class="imp-poster"></div>'}
+      <div class="imp-text">
+        <div class="imp-title">${media ? esc(media.title) + (media.year ? ` <span style="color:var(--dim);font-weight:400">${media.year}</span>` : '') : '<span style="color:var(--red)">No match found</span>'}</div>
+        <div class="imp-raw">from “${esc(row.raw)}”${detail.length ? ' · ' + esc(detail.join(' · ')) : ''}</div>
+      </div>
+      ${alts}
+      <span class="imp-tag">${tag}</span>
+    </div>`;
+  }).join('');
+
+  box.innerHTML = head + body;
+
+  $('#bulkAddBtn')?.addEventListener('click', commitBulk);
+  box.querySelectorAll('[data-pick]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const row = ui.bulkRows[+e.target.dataset.pick];
+      row.skip = !e.target.checked;
+      renderBulkRows();
+    });
+  });
+  box.querySelectorAll('[data-alt]').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const row = ui.bulkRows[+e.target.dataset.alt];
+      row.chosen = +e.target.value;
+      row.skip = false;
+      row.note = null;
+      // A hand-picked match is trusted; only re-flag it if it's already owned.
+      const media = row.results[row.chosen];
+      if (media && state.items[media.key]) { row.conf = 'dupe'; row.skip = true; row.note = 'already in your library'; }
+      else row.conf = 'likely';
+      renderBulkRows();
+    });
+  });
+}
+
+function commitBulk() {
+  const fallback = $('#bulkStatus').value;
+  const picked = (ui.bulkRows || []).filter(r => !r.skip && r.results[r.chosen]);
+  let added = 0;
+
+  picked.forEach((row, i) => {
+    const media = row.results[row.chosen];
+    if (state.items[media.key]) return;
+    state.items[media.key] = Object.assign({}, media, {
+      status: row.status || fallback,
+      rating: row.rating || null,
+      progress: null,
+      tags: [],
+      note: '',
+      ratings: null,
+      // Staggered so "Recently added" keeps the order you pasted them in.
+      addedAt: Date.now() - i,
+      updatedAt: Date.now() - i,
+    });
+    delete state.hidden[media.key];
+    added++;
+  });
+
+  save();
+  ui.recs = null;          // a batch this size changes what you should watch next
+  renderAll();
+  toast(`Added ${added} title${added === 1 ? '' : 's'} to your library.`);
+
+  // Re-flag the committed rows instead of clearing, so it's visible what landed.
+  for (const row of ui.bulkRows) {
+    const media = row.results[row.chosen];
+    if (media && state.items[media.key]) { row.conf = 'dupe'; row.skip = true; row.note = 'in your library'; }
+  }
+  renderBulkRows();
 }
 
 /* ══ Recommendations ═════════════════════════════════════════════════════ */
@@ -1099,6 +1331,13 @@ function bind() {
 
   $('#searchBtn').addEventListener('click', runSearch);
   $('#searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+
+  $('#bulkMatchBtn').addEventListener('click', runBulkMatch);
+  $('#bulkClearBtn').addEventListener('click', () => {
+    $('#bulkInput').value = '';
+    ui.bulkRows = [];
+    $('#bulkResults').innerHTML = '';
+  });
 
   $('#libraryFilter').addEventListener('input', e => { ui.filter = e.target.value; renderLibrary(); });
   $('#sortSelect').addEventListener('change', e => { ui.sort = e.target.value; renderLibrary(); });

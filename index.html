@@ -6,7 +6,7 @@
 <meta name="description" content="Losinn's Watchlist — track the shows, anime and films you've watched, with IMDb / Rotten Tomatoes / Metacritic ratings, per-episode IMDb scores, and recommendations built from your own library.">
 <title>Losinn's Watchlist</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -76,6 +76,34 @@
     <div class="seg seg-wrap" id="searchTypeSeg" style="margin-top:12px"></div>
     <p class="notes" id="searchNote">Add anything you've watched — status, your own score and progress are all editable after.</p>
     <div class="card-grid" id="searchGrid" style="margin-top:16px"></div>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel-title">Paste a list <span class="panel-title-sub">— one title per line, or comma separated</span></h2>
+    <textarea id="bulkInput" spellcheck="false" placeholder="Attack on Titan
+2. Breaking Bad - 9
+Frieren (2023) 10
+The Bear — watching
+Dune, Arrival, Sicario"></textarea>
+    <div class="control-row" style="margin-top:10px">
+      <label>Add as</label>
+      <select id="bulkStatus">
+        <option value="completed">Completed</option>
+        <option value="watching">Watching</option>
+        <option value="planned">Plan to watch</option>
+        <option value="paused">On hold</option>
+        <option value="dropped">Dropped</option>
+      </select>
+      <button class="btn btn-accent" id="bulkMatchBtn">Find these</button>
+      <button class="btn btn-secondary btn-tiny" id="bulkClearBtn">Clear</button>
+    </div>
+    <p class="notes">
+      Numbering, bullets and a trailing year are stripped automatically. A trailing
+      number is read as your score (<code>Breaking Bad - 9</code>), and a trailing
+      word like <code>watching</code> or <code>dropped</code> sets that title's status.
+      Nothing is added until you've checked the matches.
+    </p>
+    <div id="bulkResults"></div>
   </section>
 </main>
 
@@ -165,6 +193,6 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
