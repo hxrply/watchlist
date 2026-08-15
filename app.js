@@ -15,6 +15,9 @@
 
 const DB_KEY = 'losinn.watchlist.v1';
 const CACHE_KEY = 'losinn.watchlist.cache.v1';
+// Which tab/filters you left it on. Kept in its own key so the library format
+// never has to change to accommodate a UI preference.
+const PREF_KEY = 'losinn.watchlist.ui.v1';
 
 const IMG = 'https://image.tmdb.org/t/p/';
 const ANIMATION_GENRE = 16;
@@ -87,6 +90,32 @@ function save() {
   } catch (e) {
     toast('Could not save — browser storage is full.');
   }
+}
+
+function loadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
+    if (p.section) ui.section = p.section;
+    if (p.status) ui.status = p.status;
+    if (p.sort) ui.sort = p.sort;
+    if (p.view) ui.view = p.view;
+    if (p.browseScope) ui.browse.scope = p.browseScope;
+  } catch (e) { /* a bad prefs blob should never stop the app loading */ }
+
+  // A remembered tag section is meaningless once that tag is gone.
+  if (ui.section.startsWith('tag:')) {
+    const tag = ui.section.slice(4);
+    if (!Object.values(state.items).some(i => (i.tags || []).includes(tag))) ui.section = 'all';
+  }
+}
+
+function savePrefs() {
+  try {
+    localStorage.setItem(PREF_KEY, JSON.stringify({
+      section: ui.section, status: ui.status, sort: ui.sort,
+      view: ui.view, browseScope: ui.browse.scope,
+    }));
+  } catch (e) { /* preferences are not worth an error */ }
 }
 
 // Cache writes are frequent, so batch them to the end of the tick.
@@ -277,6 +306,13 @@ function esc(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Placeholder cards while a grid loads: the layout settles once, instead of
+// jumping when the real results land.
+function skeletons(n) {
+  return Array.from({ length: n }, () =>
+    '<div class="card sk-card"><div class="sk-poster"></div><div class="sk-line"></div><div class="sk-line short"></div></div>').join('');
+}
+
 let toastTimer = null;
 function toast(msg) {
   const el = $('#toast');
@@ -316,8 +352,10 @@ function cardHtml(media, opts = {}) {
 
   return `
     <article class="card ${opts.owned ? 'owned' : ''}" data-key="${media.key}">
-      ${inLib ? `<div class="status-strip st-${inLib.status}"></div>` : ''}
-      <div style="position:relative">${posterHtml(media)}${badges.join('')}</div>
+      <div class="poster-wrap">
+        ${posterHtml(media)}${badges.join('')}
+        ${inLib ? `<div class="status-strip st-${inLib.status}"></div>` : ''}
+      </div>
       <div class="card-body">
         <div class="card-title">${esc(media.title)}</div>
         <div class="card-meta">${meta.map(esc).join(' · ')}</div>
@@ -424,7 +462,7 @@ async function runSearch() {
   const grid = $('#searchGrid');
   if (!q) { showTrending(); return; }
 
-  grid.innerHTML = '<p class="loading">Searching…</p>';
+  grid.innerHTML = skeletons(10);
   try {
     const data = await tmdb('/search/multi', { query: q, include_adult: 'false' }, TTL.search);
     let results = (data.results || []).map(r => normalize(r)).filter(Boolean);
@@ -450,7 +488,7 @@ async function runSearch() {
 async function showTrending() {
   const grid = $('#searchGrid');
   if (!state.settings.tmdbKey) { grid.innerHTML = ''; return; }
-  grid.innerHTML = '<p class="loading">Loading what\'s trending…</p>';
+  grid.innerHTML = skeletons(12);
   try {
     const data = await tmdb('/trending/all/week', {}, TTL.search);
     const results = (data.results || []).map(r => normalize(r)).filter(Boolean).slice(0, 18);
@@ -734,7 +772,7 @@ async function buildRecs() {
     return;
   }
 
-  grid.innerHTML = `<p class="loading">Reading ${seeds.length} of your favourites…</p>`;
+  grid.innerHTML = skeletons(10);
   const affinity = genreAffinity();
   const scores = new Map();   // key -> { media, score, why: [] }
 
@@ -822,7 +860,7 @@ async function loadBrowse(append) {
   const grid = $('#browseGrid');
   const more = $('#browseMore');
 
-  if (!append) { b.page = 1; b.items = []; grid.innerHTML = '<p class="loading">Loading…</p>'; }
+  if (!append) { b.page = 1; b.items = []; grid.innerHTML = skeletons(12); }
   more.innerHTML = '<p class="loading">Loading…</p>';
 
   const decade = b.decade
@@ -1322,6 +1360,7 @@ function importData(file) {
 
 function setView(view) {
   ui.view = view;
+  savePrefs();
   $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + view; });
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   if (view === 'settings') renderSettings();
@@ -1331,7 +1370,14 @@ function setView(view) {
   window.scrollTo({ top: 0 });
 }
 
+function renderNavCount() {
+  const n = Object.keys(state.items).length;
+  const btn = $('.nav-btn[data-view="library"]');
+  btn.innerHTML = 'Library' + (n ? ` <span class="nav-count">${n}</span>` : '');
+}
+
 function renderAll() {
+  renderNavCount();
   renderSections();
   renderStatusSeg();
   renderStats();
@@ -1354,16 +1400,17 @@ document.addEventListener('click', e => {
 
   // Library filters
   if (el.dataset.section && !el.dataset.act) {
-    ui.section = el.dataset.section; ui.status = 'all'; renderAll(); return;
+    ui.section = el.dataset.section; ui.status = 'all'; savePrefs(); renderAll(); return;
   }
   if (el.dataset.status && !el.dataset.act && el.classList.contains('seg-btn') && el.closest('#statusSeg')) {
-    ui.status = el.dataset.status; renderAll(); return;
+    ui.status = el.dataset.status; savePrefs(); renderAll(); return;
   }
   if (el.dataset.searchtype) { ui.searchType = el.dataset.searchtype; renderSearchSeg(); runSearch(); return; }
   if (el.dataset.recscope) { ui.recScope = el.dataset.recscope; renderRecSeg(); renderRecs(); return; }
   if (el.dataset.browsescope) {
     ui.browse.scope = el.dataset.browsescope;
     ui.browse.genre = '';
+    savePrefs();
     renderBrowseScope();
     loadGenreOptions();
     loadBrowse(false);
@@ -1506,7 +1553,21 @@ function bind() {
   });
 
   $('#libraryFilter').addEventListener('input', e => { ui.filter = e.target.value; renderLibrary(); });
-  $('#sortSelect').addEventListener('change', e => { ui.sort = e.target.value; renderLibrary(); });
+  $('#sortSelect').addEventListener('change', e => { ui.sort = e.target.value; savePrefs(); renderLibrary(); });
+
+  // "/" jumps to whichever box makes sense for the tab you're on.
+  document.addEventListener('keydown', e => {
+    if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+    if (!$('#modal').hidden) return;
+    const target = ui.view === 'library' ? $('#libraryFilter')
+                 : ui.view === 'discover' ? $('#searchInput') : null;
+    if (target) { e.preventDefault(); target.focus(); target.select(); }
+  });
+
+  const toTop = $('#toTop');
+  toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  window.addEventListener('scroll', () => { toTop.hidden = window.scrollY < 600; }, { passive: true });
 
   $('#recRefresh').addEventListener('click', () => {
     // Drop cached recommendation payloads so a rebuild really is a rebuild.
@@ -1556,10 +1617,13 @@ function bind() {
 /* ══ Boot ════════════════════════════════════════════════════════════════ */
 
 load();
+loadPrefs();
 bind();
+$('#sortSelect').value = ui.sort;
 renderSearchSeg();
 renderRecSeg();
 renderBrowseScope();
 renderAll();
 renderSettings();
-if (!state.settings.tmdbKey) setView('settings');
+// Straight to Settings until there's a key; otherwise back where you left off.
+setView(state.settings.tmdbKey ? ui.view : 'settings');

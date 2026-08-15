@@ -6,7 +6,7 @@
 <meta name="description" content="Losinn's Watchlist — track the shows, anime and films you've watched, with IMDb / Rotten Tomatoes / Metacritic ratings, per-episode IMDb scores, and recommendations built from your own library.">
 <title>Losinn's Watchlist</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -55,7 +55,7 @@
   <section class="panel main-col">
     <div class="col-head">
       <h2 class="panel-title" id="libraryTitle">Everything</h2>
-      <input type="text" id="libraryFilter" placeholder="filter your library…">
+      <input type="text" id="libraryFilter" placeholder="filter your library…  ( / )">
     </div>
     <div class="card-grid" id="libraryGrid"></div>
     <p class="empty" id="libraryEmpty" hidden>
@@ -219,8 +219,10 @@ Dune, Arrival, Sicario"></textarea>
   </div>
 </div>
 
+<button class="to-top" id="toTop" hidden aria-label="Back to top" title="Back to top">↑</button>
+
 <div class="toast" id="toast" hidden></div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
